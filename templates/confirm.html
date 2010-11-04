@@ -18,8 +18,8 @@
 </form>
 {% else %}
 <form action="{{ post_url }}" method="post">{% csrf_token %}
-<input type="hidden" name="Ds_Merchant_Currency" value="{{MERCHANT_CURRENCY}}" />
-<input type="hidden" name="Ds_Merchant_Titular" value="{{MERCHANT_TITULAR}}" />
+<input type="hidden" name="moneda" value="{{MERCHANT_CURRENCY}}" />
+<input type="hidden" name="Titular" value="{{MERCHANT_TITULAR}}" />
 <input type="hidden" name="Ds_Merchant_MerchantURL" value="{{url_callback}}" />
 <input type="hidden" name="Ds_Merchant_UrlOK" value="{{url_ok}}" />
 <input type="hidden" name="Ds_Merchant_UrlKO" value="{{url_ko}}" />
@@ -27,15 +27,16 @@
 <input type="hidden" name="Ds_Merchant_ConsumerLanguage" value="2" />	{# English #}
 
 {% if order.partially_paid %}
-	<input type="hidden" name="Ds_Merchant_ProductDescription" value="Remaining Balance for order {{order.id}}" />
+	<input type="hidden" name="descripcion" value="Remaining Balance for order {{order.id}}" />
 {% else %}
-	<input type="hidden" name="Ds_Merchant_ProductDescription" value="Order {{order.id}}" />
+	<input type="hidden" name="descripcion" value="Order {{order.id}}" />
 {% endif %}
 
-<input type="hidden" name="Ds_Merchant_Amount" value="{{amount}}" />
-<input type="hidden" name="Ds_Merchant_Order" value="{{xchg_order_id}}" />
+<input type="hidden" name="usuarioId" value="{{usuarioId}}" />
+<input type="hidden" name="valor" value="{{amount}}" />
+<input type="hidden" name="refVenta" value="{{xchg_order_id}}" />
 
-<input type="hidden" name="Ds_Merchant_MerchantSignature" value="{{signature}}" />
+<input type="hidden" name="firma" value="{{signature}}" />
 
 <input class="large glossy button" type="submit" value="{% trans "Purchase Items" %}" />
 </form>

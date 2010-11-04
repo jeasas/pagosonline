@@ -69,10 +69,9 @@ def confirm_info(request):
     live = payment_module.LIVE.value
     if live:
         post_url = payment_module.POST_URL.value
-        #terminal = payment_module.MERCHANT_TERMINAL.value
     else:
         post_url = payment_module.POST_TEST_URL.value
-        #terminal = payment_module.MERCHANT_TEST_TERMINAL.value
+    #
     # PAGOSONLINE system does not accept multiple payment attempts with the same refVenta, even
     # if the previous one has never been finished. The worse is that it does not display
     # any message which could be understood by an end user.
@@ -90,8 +89,8 @@ def confirm_info(request):
 
     signature_code = payment_module.MERCHANT_SIGNATURE_CODE.value
     userId = payment_module.MERCHANT_USERID_CODE.value
-    amount = "%d" % (order.balance)
-    signature_data = ''.join(
+    amount = "%d" % (order.balance,)
+    signature_data = '~'.join(
             map(str, (
                     signature_code,
                     userId,
@@ -111,19 +110,19 @@ def confirm_info(request):
     url_ko = _resolve_local_url(payment_module, payment_module.MERCHANT_URL_KO)
 
     ctx = {
-        'prueba': live,
+        'live': live,
         'post_url': post_url,
-        'moneda': payment_module.MERCHANT_CURRENCY.value,
-        #'MERCHANT_TITULAR': payment_module.MERCHANT_TITULAR.value,
-        #'url_callback': url_callback,
-        #'url_ok': url_ok,
-        #'url_ko': url_ko,
-        'descripcion': order,
-        'refVenta': xchg_order_id,
-        'valor': amount,
-        'llave_encripcion': signature,
-        'iva': config_value('TAX', 'DEFAULT_VIEW_TAX'),
-	'baseDevolucionIva': amount,
+        'MERCHANT_CURRENCY': payment_module.MERCHANT_CURRENCY.value,
+        'MERCHANT_TITULAR': payment_module.MERCHANT_TITULAR.value,
+        'url_callback': url_callback,
+        'url_ok': url_ok,
+        'url_ko': url_ko,
+        'usuarioId': userId,
+	'order': order,
+        'xchg_order_id': xchg_order_id,
+        'amount': amount,
+        'signature': signature,
+        'default_view_tax': config_value('TAX', 'DEFAULT_VIEW_TAX'),
     }
     return render_to_response(template, ctx, context_instance=RequestContext(request))
 confirm_info = never_cache(confirm_info)
