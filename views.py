@@ -69,8 +69,10 @@ def confirm_info(request):
     live = payment_module.LIVE.value
     if live:
         post_url = payment_module.POST_URL.value
+	prueba = 0
     else:
         post_url = payment_module.POST_TEST_URL.value
+	prueba = 1
     #
     # PAGOSONLINE system does not accept multiple payment attempts with the same refVenta, even
     # if the previous one has never been finished. The worse is that it does not display
@@ -89,19 +91,21 @@ def confirm_info(request):
 
     signature_code = payment_module.MERCHANT_SIGNATURE_CODE.value
     userId = payment_module.MERCHANT_USERID_CODE.value
-    amount = "%d" % (order.balance,)
+    amount = "%.2f" % order.balance
+    coin = payment_module.MERCHANT_CURRENCY.value
     signature_data = '~'.join(
             map(str, (
                     signature_code,
                     userId,
                     xchg_order_id,
                     amount,
-                    payment_module.MERCHANT_CURRENCY.value,
+                    coin,
                     )
                )
             )
 
-    signature= md5(signature_data).hexdigest()
+    signature=md5(signature_data).hexdigest()
+    log.debug("signature to be sent %s" %  signature)
 
     template = lookup_template(payment_module, 'shop/checkout/pagosonline/confirm.html')
 
@@ -112,7 +116,7 @@ def confirm_info(request):
     ctx = {
         'live': live,
         'post_url': post_url,
-        'MERCHANT_CURRENCY': payment_module.MERCHANT_CURRENCY.value,
+        'coin': payment_module.MERCHANT_CURRENCY.value,
         'MERCHANT_TITULAR': payment_module.MERCHANT_TITULAR.value,
         'url_callback': url_callback,
         'url_ok': url_ok,
@@ -122,6 +126,7 @@ def confirm_info(request):
         'xchg_order_id': xchg_order_id,
         'amount': amount,
         'signature': signature,
+	'prueba': prueba,
         'default_view_tax': config_value('TAX', 'DEFAULT_VIEW_TAX'),
     }
     return render_to_response(template, ctx, context_instance=RequestContext(request))
@@ -136,20 +141,21 @@ def notify_callback(request):
     else:
         log.debug("Test IPN on %s", payment_module.KEY.value)
         #terminal = payment_module.MERCHANT_TEST_TERMINAL.value
-    data = request.POST
+    data = request.GET
     log.debug("Transaction data: " + repr(data))
     try:
-        sig_data = "%s%s%s%s%s%s" % (
-                data['Ds_Amount'],
-                data['Ds_Order'],
-                data['Ds_MerchantCode'],
-                data['Ds_Currency'],
-                data['Ds_Response'],
-                signature_code
-                )
+        sig_data = '~'.join(
+		map(str,(
+                signature_code,
+		data['usuario_id'],
+                data['ref_venta'],
+                data['valor'],
+                data['moneda'],
+		data['estado_pol']
+		)))
         sig_calc = md5(sig_data).hexdigest()
-        if sig_calc != data['Ds_Signature'].lower():
-            log.error("Invalid signature. Received '%s', calculated '%s'." % (data['Ds_Signature'], sig_calc))
+       	if sig_calc != data['firma'].lower():
+            log.error("Invalid signature. Received '%s', calculated '%s'. sig_data %s" % (data['firma'], sig_calc, sig_data))
             return HttpResponseBadRequest("Checksum error")
 #        if data['Ds_MerchantCode'] != payment_module.MERCHANT_FUC.value:
 #            log.error("Invalid FUC code: %s" % data['Ds_MerchantCode'])
@@ -159,7 +165,7 @@ def notify_callback(request):
 #            return HttpResponseNotFound("Unknown terminal number")
         # TODO: fields Ds_Currency, Ds_SecurePayment may be worth checking
 
-        xchg_order_id = data['Ds_Order']
+        xchg_order_id = data['ref_venta']
         try:
             order_id = xchg_order_id[:xchg_order_id.index('T')]
         except ValueError:
@@ -170,9 +176,9 @@ def notify_callback(request):
         except Order.DoesNotExist:
             log.error("Received data for nonexistent Order #%s" % order_id)
             return HttpResponseNotFound("Order not found")
-        amount = Decimal(data['Ds_Amount']) / Decimal('100')    # is in cents, divide it
-        if int(data['Ds_Response']) > 100:
-            log.info("Response code is %s. Payment not accepted." % data['Ds_Response'])
+        amount = Decimal(data['valor']) 
+        if int(data['codigo_respuesta_pol']) != 1:
+            log.info("Response code is %s. Payment not accepted." % data['codigo_respuesta_pol'])
             return HttpResponse()
     except KeyError:
         log.error("Received incomplete PAGOSONLINE transaction data")
@@ -182,8 +188,8 @@ def notify_callback(request):
     processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
     payment = processor.record_payment(
         order=order,
-        amount=amount)
-        #transaction_id=data['Ds_AuthorisationCode'])
+        amount=amount,
+        transaction_id=data['codigo_autorizacion'])
     # empty customer's carts
     for cart in Cart.objects.filter(customer=order.contact):
         cart.empty()
