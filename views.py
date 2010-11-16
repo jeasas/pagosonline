@@ -21,6 +21,7 @@ from payment.views import payship
 from satchmo_store.shop.models import Order, Cart
 from satchmo_store.shop.satchmo_settings import get_satchmo_setting
 from satchmo_utils.dynamic import lookup_url, lookup_template
+from satchmo_utils.views import bad_or_missing
 import logging
 try:
     from hashlib import md5
@@ -100,48 +101,150 @@ def confirm_info(request):
                     xchg_order_id,
                     amount,
                     coin,
-                    )
-               )
-            )
-
+                    )))
+	
+    iva_calc = float(amount) * 0.08
+    iva = "%.2f" % iva_calc
     signature=md5(signature_data).hexdigest()
-    log.debug("signature to be sent %s" %  signature)
+#    log.debug("signature to be sent %s" %  signature)
 
     template = lookup_template(payment_module, 'shop/checkout/pagosonline/confirm.html')
 
     url_callback = _resolve_local_url(payment_module, payment_module.MERCHANT_URL_CALLBACK, ssl=get_satchmo_setting('SSL'))
-    url_ok = _resolve_local_url(payment_module, payment_module.MERCHANT_URL_OK)
-    url_ko = _resolve_local_url(payment_module, payment_module.MERCHANT_URL_KO)
-
+    url_ans = _resolve_local_url(payment_module, payment_module.MERCHANT_URL_OK)
+#    url_ko = _resolve_local_url(payment_module, payment_module.MERCHANT_URL_KO)
+    
     ctx = {
         'live': live,
         'post_url': post_url,
         'coin': payment_module.MERCHANT_CURRENCY.value,
-        'MERCHANT_TITULAR': payment_module.MERCHANT_TITULAR.value,
         'url_callback': url_callback,
-        'url_ok': url_ok,
-        'url_ko': url_ko,
+        'url_ans': url_ans,
         'usuarioId': userId,
 	'order': order,
         'xchg_order_id': xchg_order_id,
         'amount': amount,
         'signature': signature,
 	'prueba': prueba,
+	'iva': iva,
         'default_view_tax': config_value('TAX', 'DEFAULT_VIEW_TAX'),
     }
     return render_to_response(template, ctx, context_instance=RequestContext(request))
 confirm_info = never_cache(confirm_info)
 
+def answerpay(request):
+
+    payment_module = config_get_group('PAYMENT_PAGOSONLINE')
+
+    """
+    This can be used to generate a receipt or some other confirmation
+    """
+    data = request.GET
+    estado = {
+	'1': "Sin Abrir",
+	'2': "Abierta",
+	'4': "Pagada y Abonada",
+	'5': "Cancelada",
+	'6': "Rechazada",
+	'7': "Validacion",
+	'8': "Reversada",
+	'9': "Reversada fraudulenta",
+	'10': "Enviada a ente financiero",
+	'11': "Capturando datos tarjeta de credito",
+	'12': "Esperando confirmacion sistema PSE",
+	'13': "Activa Debitos ACH",
+	'14': "Confirmando pago Efecty",
+	'15': "Impreso",
+	'16': "Debito ACH Registrado",
+	}
+
+    codigo = {
+	'1': "Transaccion aprobada",
+	'2': "Pago cancelado por el usuario",
+	'3': "Pago cancelado por el usuario durante validacion",
+	'4': "Transaccion rechazada por la entidad",
+	'5': "Transaccion declinada por la entidad",
+	'6': "Fondos insuficientes",
+	'7': "Tarjeta invalida",
+	'8': "Acuda a su entidad",
+	'9': "Tarjeta vencida",
+	'10': "Tarjeta restringida",
+	'11': "Discrecional POL",
+	'12': "Fecha de expiracion o campo seg. Invalidos",
+	'13': "Repita transaccion",
+	'14': "Transaccion invalida",
+	'15': "Transaccion en proceso de validacion",
+	'16': "Combinacion usuario-contrasena invalidos",
+	'17': "Monto excede maximo permitido por entidad",
+	'18': "Documento de identificacion invalido",
+	'19': "Transaccion abandonada capturando datos TC",
+	'20': "Transaccion abandonada",
+	'21': "Imposible reversar transaccion",
+	'22': "Tarjeta no autorizada para realizar compras por internet.",
+	'23': "Transaccion rechazada",
+	'24': "Transaccion parcial aprobada",
+	'25': "Rechazada por no confirmacion",
+	'26': "Comprobante generado, esperando pago en banco",
+	'9994': "Transaccion pendiente por confirmar",
+	'9995': "Certificado digital no encontrado",
+	'9996': "Entidad no responde",
+	'9997': "Error de mensajeria con la entidad financiera",
+	'9998': "Error en la entidad financiera",
+	'9999': "Error no especificado",
+	}
+
+    tipo_pago = {
+	'10': "VISA",
+	'11': "MASTERCARD",
+	'12': "AMEX",
+	'22': "DINERS",
+	'24': "Verified by VISA",
+	'25': "PSE",
+	'27': "VISA Debito",
+	'30': "Efecty",
+	'31': "Pago referenciado",
+	}	
+    
+    buyinfo = {
+        'coin': payment_module.MERCHANT_CURRENCY.value,
+        'ref_venta': data['ref_venta'],
+        'order_idpagos': data['ref_pol'],
+        'amount': data['valor'],
+        'ivatra': data['iva'],
+	'estadopol': estado[data['estado_pol']],
+	'codigoresp': codigo[data['codigo_respuesta_pol']],
+	'fechaprocesamiento': data['fecha_procesamiento'],
+	'msg': data['mensaje'],
+	'tipo_medio_pago': tipo_pago[data['medio_pago']],
+	}    
+
+    global codigo
+    global tipo_pago
+    try:
+        order = Order.objects.from_request(request)
+    except Order.DoesNotExist:
+        return bad_or_missing(request, _('Your order has already been processed.'))
+
+    del request.session['orderID']
+    # empty customer's carts
+    for cart in Cart.objects.filter(customer=order.contact):
+        cart.empty()
+
+    return render_to_response('shop/checkout/pagosonline/answer.html', buyinfo,
+                              context_instance=RequestContext(request))
+
+answerpay = never_cache(answerpay)
+ 
+
 def notify_callback(request):
+    
     payment_module = config_get_group('PAYMENT_PAGOSONLINE')
     signature_code = payment_module.MERCHANT_SIGNATURE_CODE.value
     if payment_module.LIVE.value:
         log.debug("Live IPN on %s", payment_module.KEY.value)
-        #terminal = payment_module.MERCHANT_TERMINAL.value
     else:
         log.debug("Test IPN on %s", payment_module.KEY.value)
-        #terminal = payment_module.MERCHANT_TEST_TERMINAL.value
-    data = request.GET
+    data = request.POST
     log.debug("Transaction data: " + repr(data))
     try:
         sig_data = '~'.join(
@@ -157,13 +260,6 @@ def notify_callback(request):
        	if sig_calc != data['firma'].lower():
             log.error("Invalid signature. Received '%s', calculated '%s'. sig_data %s" % (data['firma'], sig_calc, sig_data))
             return HttpResponseBadRequest("Checksum error")
-#        if data['Ds_MerchantCode'] != payment_module.MERCHANT_FUC.value:
-#            log.error("Invalid FUC code: %s" % data['Ds_MerchantCode'])
-#            return HttpResponseNotFound("Unknown FUC code")
-#        if int(data['Ds_Terminal']) != int(terminal):
-#            log.error("Invalid terminal number: %s" % data['Ds_Terminal'])
-#            return HttpResponseNotFound("Unknown terminal number")
-        # TODO: fields Ds_Currency, Ds_SecurePayment may be worth checking
 
         xchg_order_id = data['ref_venta']
         try:
@@ -177,7 +273,7 @@ def notify_callback(request):
             log.error("Received data for nonexistent Order #%s" % order_id)
             return HttpResponseNotFound("Order not found")
         amount = Decimal(data['valor']) 
-        if int(data['codigo_respuesta_pol']) != 1:
+        if int(data['codigo_respuesta_pol']) != 1 or int(data['codigo_respuesta_pol']) != 26 or int(data['codigo_respuesta_pol']) != 24 or int(data['codigo_respuesta_pol']) != 9994:
             log.info("Response code is %s. Payment not accepted." % data['codigo_respuesta_pol'])
             return HttpResponse()
     except KeyError:
@@ -189,9 +285,12 @@ def notify_callback(request):
     payment = processor.record_payment(
         order=order,
         amount=amount,
-        transaction_id=data['codigo_autorizacion'])
+        cod_resp=codigo[data['codigo_respuesta_pol']],
+	ref_venta=data['ref_venta'],
+	medio_pago=tipo_pago[data['tipo_medio_pago']],
+	fechatrans=data['fecha_transaccion'],
+	transaction_id=data['codigo_autorizacion'])
     # empty customer's carts
     for cart in Cart.objects.filter(customer=order.contact):
         cart.empty()
-    return HttpResponse()
-   
+#    return HttpResponse()
