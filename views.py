@@ -140,6 +140,9 @@ def answerpay(request):
     This can be used to generate a receipt or some other confirmation
     """
     data = request.GET
+    global codigo
+    global tipo_pago
+
     estado = {
 	'1': "Sin Abrir",
 	'2': "Abierta",
@@ -218,20 +221,30 @@ def answerpay(request):
 	'tipo_medio_pago': tipo_pago[data['medio_pago']],
 	}    
 
-    global codigo
-    global tipo_pago
     try:
         order = Order.objects.from_request(request)
     except Order.DoesNotExist:
         return bad_or_missing(request, _('Your order has already been processed.'))
 
-    del request.session['orderID']
+    # Store payment status
+    order.add_status(status=buyinfo['estadopol'], notes=u"Processed through PAGOSONLINE.")
+    processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+    payment = processor.record_payment(
+        order=order,
+        amount=amount,
+        cod_resp=codigo[data['codigo_respuesta_pol']],
+        ref_venta=data['ref_venta'],
+        medio_pago=tipo_pago[data['tipo_medio_pago']],
+        fechatrans=data['fecha_transaccion'],
+        transaction_id=data['codigo_autorizacion'])
+    
     # empty customer's carts
     for cart in Cart.objects.filter(customer=order.contact):
         cart.empty()
-
+    
     return render_to_response('shop/checkout/pagosonline/answer.html', buyinfo,
                               context_instance=RequestContext(request))
+    del request.session['orderID']
 
 answerpay = never_cache(answerpay)
  
@@ -275,7 +288,7 @@ def notify_callback(request):
         amount = Decimal(data['valor']) 
         if int(data['codigo_respuesta_pol']) != 1 or int(data['codigo_respuesta_pol']) != 26 or int(data['codigo_respuesta_pol']) != 24 or int(data['codigo_respuesta_pol']) != 9994:
             log.info("Response code is %s. Payment not accepted." % data['codigo_respuesta_pol'])
-            return HttpResponse()
+            #return HttpResponse()
     except KeyError:
         log.error("Received incomplete PAGOSONLINE transaction data")
         return HttpResponseBadRequest("Incomplete data")
@@ -293,4 +306,4 @@ def notify_callback(request):
     # empty customer's carts
     for cart in Cart.objects.filter(customer=order.contact):
         cart.empty()
-#    return HttpResponse()
+    #return HttpResponse()
