@@ -114,6 +114,7 @@ def confirm_info(request):
     url_ans = _resolve_local_url(payment_module, payment_module.MERCHANT_URL_OK)
 #    url_ko = _resolve_local_url(payment_module, payment_module.MERCHANT_URL_KO)
     
+    
     ctx = {
         'live': live,
         'post_url': post_url,
@@ -121,12 +122,12 @@ def confirm_info(request):
         'url_callback': url_callback,
         'url_ans': url_ans,
         'usuarioId': userId,
-	'order': order,
+	    'order': order,
         'xchg_order_id': xchg_order_id,
         'amount': amount,
         'signature': signature,
-	'prueba': prueba,
-	'iva': iva,
+	    'prueba': prueba,
+	    'iva': iva,
         'default_view_tax': config_value('TAX', 'DEFAULT_VIEW_TAX'),
     }
     return render_to_response(template, ctx, context_instance=RequestContext(request))
@@ -207,47 +208,63 @@ def answerpay(request):
 	'30': "Efecty",
 	'31': "Pago referenciado",
 	}	
-    
-    buyinfo = {
-        'coin': payment_module.MERCHANT_CURRENCY.value,
-        'ref_venta': data['ref_venta'],
-        'order_idpagos': data['ref_pol'],
-        'amount': data['valor'],
-        'ivatra': data['iva'],
-	'estadopol': estado[data['estado_pol']],
-	'codigoresp': codigo[data['codigo_respuesta_pol']],
-	'fechaprocesamiento': data['fecha_procesamiento'],
-	'msg': data['mensaje'],
-	'tipo_medio_pago': tipo_pago[data['medio_pago']],
-	}    
+    try:    
+        buyinfo = {
+            'coin': payment_module.MERCHANT_CURRENCY.value,
+            'ref_venta': data['ref_venta'],
+            'order_idpagos': data['ref_pol'],
+            'amount': data['valor'],
+            'ivatra': data['iva'],
+    	    'estadopol': estado[data['estado_pol']],
+    	    'codigoresp': codigo[data['codigo_respuesta_pol']],
+    	    'fechaprocesamiento': data['fecha_procesamiento'],
+    	    'msg': data['mensaje'],
+    	    'tipo_medio_pago': tipo_pago[data['medio_pago']],
+    	}    
+    except KeyError:
+        return HttpResponseRedirect('/') 
 
+    xchg_order_id = data['ref_venta']
+    try:
+    	order_id = xchg_order_id[:xchg_order_id.index('T')]
+    except ValueError:
+        log.error("Incompatible order ID: '%s'" % xchg_order_id)
+        return HttpResponseNotFound("Order not found")
+    try:
+        order = Order.objects.get(id=order_id)
+    except Order.DoesNotExist:
+        log.error("Received data for nonexistent Order #%s" % order_id)
+        return HttpResponseNotFound("Order not found")
     try:
         order = Order.objects.from_request(request)
     except Order.DoesNotExist:
         return bad_or_missing(request, _('Your order has already been processed.'))
 
     # Store payment status
-    order.add_status(status=buyinfo['estadopol'], notes=u"Processed through PAGOSONLINE.")
-    processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
-    payment = processor.record_payment(
-        order=order,
-        amount=amount,
-        cod_resp=codigo[data['codigo_respuesta_pol']],
-        ref_venta=data['ref_venta'],
-        medio_pago=tipo_pago[data['tipo_medio_pago']],
-        fechatrans=data['fecha_transaccion'],
-        transaction_id=data['codigo_autorizacion'])
+    if int(data['codigo_respuesta_pol']) != 1 and int(data['codigo_respuesta_pol']) != 26 and int(data['codigo_respuesta_pol']) != 24 and int(data['codigo_respuesta_pol']) != 9994:
+        order.add_status(status='Cancelled', notes=u"Processed through PAGOSONLINE. answerpay %s" % data['codigo_respuesta_pol'])
+    else:
+        order.add_status(status='New', notes=u"Processed through PAGOSONLINE. answerpay %s" % data['codigo_respuesta_pol'])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']))
     
-    # empty customer's carts
-    for cart in Cart.objects.filter(customer=order.contact):
+    # empty customer's cart
+    #for cart in Cart.objects.from_request(request):
+    #    cart.empty()
+    cartnumber = request.session['cart']
+    for cart in Cart.objects.filter(id=cartnumber):
         cart.empty()
+#    for cart in Cart.objects.filter(customer=order.contact):
+#        cart.empty()
+
     
+    del request.session['orderID']
     return render_to_response('shop/checkout/pagosonline/answer.html', buyinfo,
                               context_instance=RequestContext(request))
-    del request.session['orderID']
 
 answerpay = never_cache(answerpay)
- 
 
 def notify_callback(request):
     
@@ -261,8 +278,7 @@ def notify_callback(request):
     log.debug("Transaction data: " + repr(data))
     try:
         sig_data = '~'.join(
-		map(str,(
-                signature_code,
+		map(str,(signature_code,
 		data['usuario_id'],
                 data['ref_venta'],
                 data['valor'],
@@ -286,24 +302,23 @@ def notify_callback(request):
             log.error("Received data for nonexistent Order #%s" % order_id)
             return HttpResponseNotFound("Order not found")
         amount = Decimal(data['valor']) 
-        if int(data['codigo_respuesta_pol']) != 1 or int(data['codigo_respuesta_pol']) != 26 or int(data['codigo_respuesta_pol']) != 24 or int(data['codigo_respuesta_pol']) != 9994:
+        if int(data['codigo_respuesta_pol']) != 1 and int(data['codigo_respuesta_pol']) != 26 and int(data['codigo_respuesta_pol']) != 24 and int(data['codigo_respuesta_pol']) != 9994:
             log.info("Response code is %s. Payment not accepted." % data['codigo_respuesta_pol'])
-            #return HttpResponse()
+    	    order.add_status(status='Cancelled', notes=u"Processed through PAGOSONLINE. notify callback %s" % data['codigo_respuesta_pol'])
+            return HttpResponse()
     except KeyError:
         log.error("Received incomplete PAGOSONLINE transaction data")
         return HttpResponseBadRequest("Incomplete data")
     # success
-    order.add_status(status='New', notes=u"Paid through PAGOSONLINE.")
+    order.add_status(status='New', notes=u"Processed through PAGOSONLINE. notify callback %s" % data['codigo_respuesta_pol'] )
     processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
     payment = processor.record_payment(
         order=order,
         amount=amount,
-        cod_resp=codigo[data['codigo_respuesta_pol']],
-	ref_venta=data['ref_venta'],
-	medio_pago=tipo_pago[data['tipo_medio_pago']],
-	fechatrans=data['fecha_transaccion'],
-	transaction_id=data['codigo_autorizacion'])
+    	transaction_id=data['codigo_autorizacion'])
     # empty customer's carts
-    for cart in Cart.objects.filter(customer=order.contact):
-        cart.empty()
-    #return HttpResponse()
+    
+    #cartnumber = request.session['cart']
+    #for cart in Cart.objects.filter(id=cartnumber):
+    #    cart.empty()
+    return HttpResponse()

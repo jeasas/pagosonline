@@ -16,9 +16,6 @@ urlpatterns = patterns('',
 #    (r'^success/$', 'payment.views.checkout.success', {'SSL': ssl}, 'PAGOSONLINE_satchmo_checkout-success'),
 #    (r'^failure/$', 'payment.views.checkout.failure', {'SSL': ssl}, 'PAGOSONLINE_satchmo_checkout-failure'),
     (r'^answer/$', 'payment.modules.pagosonline.views.answerpay', {'SSL': ssl}, 'PAGOSONLINE_satchmo_checkout-answer'),
-    (
-	r'^notify/$', 'payment.modules.pagosonline.views.notify_callback', {'SSL': ssl},
-	'PAGOSONLINE_satchmo_checkout-notify_callback'),
-    (r'^confirmorder/$', 'payment.views.confirm.confirm_free_order',
-       {'SSL' : ssl, 'key' : 'PAGOSONLINE'}, 'PAGOSONLINE_satchmo_checkout_free-confirm')
+    (r'^notify/$', 'payment.modules.pagosonline.views.notify_callback', {'SSL': ssl}, 'PAGOSONLINE_satchmo_checkout-notify_callback'),
+    (r'^confirmorder/$', 'payment.views.confirm.confirm_free_order', {'SSL' : ssl, 'key' : 'PAGOSONLINE'}, 'PAGOSONLINE_satchmo_checkout_free-confirm')
 )
