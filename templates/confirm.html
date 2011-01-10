@@ -7,7 +7,7 @@
 
 {% block payment_display %}
 <h4>{% trans "Payment" %}</h4>
-{% if not live %}<strong>PAYMENT TEST MODE</strong>{% endif %}
+{% if not live %}<strong>{% trans "PAYMENT TEST MODE" %}</strong>{% endif %}
 {% trans "Your payment will be processed through Pagos Online." %}
 {% endblock %}
 
@@ -18,15 +18,22 @@
 </form>
 {% else %}
 <form action="{{ post_url }}" method="post">{% csrf_token %}
-<input type="hidden" name="prueba" value="{{prueba}}" />
-<input type="hidden" name="moneda" value="{{coin}}" />
-<input type="hidden" name="Titular" value="{{MERCHANT_TITULAR}}" />
-<input type="hidden" name="url_respuesta" value="http://localhost/checkout/pagosonline/notify/" />
-<input type="hidden" name="_respuesta" value="{{url_callback}}" />
-<input type="hidden" name="Ds_Merchant_UrlOK" value="{{url_ok}}" />
-<input type="hidden" name="Ds_Merchant_UrlKO" value="{{url_ko}}" />
-<input type="hidden" name="Ds_Merchant_TransactionType" value="0" />	{# Autorizacion #} 
-<input type="hidden" name="Ds_Merchant_ConsumerLanguage" value="2" />	{# English #}
+
+<input type="hidden" name="prueba" value="{{ prueba }}" />
+<input type="hidden" name="iva" value="{{ iva }}" />
+<input type="hidden" name="baseDevolucionIva" value="{{ baseDevolucionIva }}" />
+<input type="hidden" name="usuarioId" value="{{ usuarioId }}" />
+<input type="hidden" name="valor" value="{{ amount }}" />
+<input type="hidden" name="refVenta" value="{{ xchg_order_id }}" />
+<input type="hidden" name="moneda" value="{{ coin }}" />
+<input type="hidden" name="url_respuesta" value="http://www.rinconcolombia.com:81/checkout/pagosonline/answer/" />
+<input type="hidden" name="url_confirmacion" value="http://www.rinconcolombia.com:81/checkout/pagosonline/notify/" />
+<input type="hidden" name="firma" value="{{ signature }}" />
+<input type="hidden" name="emailComprador" value="{{ emailComprador }}" />
+
+<input type="hidden" name="_confirmacion" value="{{ url_callback }}" />
+<input type="hidden" name="_respuesta" value="{{ url_ans }}" />
+
 
 {% if order.partially_paid %}
 	<input type="hidden" name="descripcion" value="Remaining Balance for order {{order}}" />
@@ -34,13 +41,7 @@
 	<input type="hidden" name="descripcion" value="Order {{order}}" />
 {% endif %}
 
-<input type="hidden" name="usuarioId" value="{{usuarioId}}" />
-<input type="hidden" name="valor" value="{{amount}}" />
-<input type="hidden" name="refVenta" value="{{xchg_order_id}}" />
-
-<input type="hidden" name="firma" value="{{signature}}" />
-
-<input class="large glossy button" type="submit" value="{% trans "Purchase Items" %}" />
+<input class="buttonConfirm" type="submit" value="{% trans "Purchase Items" %}" />
 </form>
 {% endif %}
 {% endblock %}

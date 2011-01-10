@@ -14,11 +14,11 @@
 <p>{% trans 'Please print out this page as a receipt.' %}</p>
 
 <table width="70%" height="70%" cellpadding="3" cellspacing="0" border="0">
+<tr><td align="left" valign="middle">{% trans "Buyer Email"%} </td><td align="left" valign="middle"> {{ emailComprador }}</td></tr>
 <tr><td align="left" valign="middle">{% trans "Order ID"%} </td><td align="left" valign="middle"> {{ ref_venta }}</td></tr>
 <tr><td align="left" valign="middle">{% trans "Pagos Online Reference ID"%}</td><td align="left" valign="middle">{{ order_idpagos }}</td></tr>
 <tr><td align="left" valign="middle">{% trans "Payment Method" %}</td><td align="left" valign="middle">{{ tipo_medio_pago }}</td></tr>
 <tr><td align="left" valign="middle">{% trans "Amount" %}</td><td align="left" valign="middle">{{ amount }}</td></tr>
-<tr><td align="left" valign="middle">{% trans "Tax" %}</td><td align="left" valign="middle">{{ ivatra }}</td></tr>
 <tr><td align="left" valign="middle">{% trans "Currency" %}</td><td align="left" valign="middle">{{ coin }}</td></tr>
 <tr><td align="left" valign="middle">{% trans "Pagos Online Payment Status" %}</td><td align="left" valign="middle">{{ estadopol }}</td></tr>
 <tr><td align="left" valign="middle">{% trans "Pagos Online Response" %}</td><td align="left" valign="middle">{{ codigoresp }}</td></tr>
