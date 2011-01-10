@@ -7,6 +7,8 @@
 #   For more information about integration look at http://ayuda.pagosonline.com/
 #
 #
+from payment.rc_calc import rc_total
+
 from datetime import datetime
 from decimal import Decimal
 from django.core import urlresolvers
@@ -102,8 +104,10 @@ def confirm_info(request):
                     amount,
                     coin,
                     )))
-	
-    iva_calc = float(amount) * 0.08
+	cartnumber = request.session['cart']
+    baseDevIva = rc_total(cartnumber)
+    baseDevolucionIva = "%.2f" % rc_total(cartnumber)
+    iva_calc = float(baseDevIva) * 0.16
     iva = "%.2f" % iva_calc
     signature=md5(signature_data).hexdigest()
 #    log.debug("signature to be sent %s" %  signature)
@@ -128,6 +132,8 @@ def confirm_info(request):
         'signature': signature,
 	    'prueba': prueba,
 	    'iva': iva,
+        'baseDevolucionIva': baseDevolucionIva,
+        'emailComprador': request.user.email,
         'default_view_tax': config_value('TAX', 'DEFAULT_VIEW_TAX'),
     }
     return render_to_response(template, ctx, context_instance=RequestContext(request))
@@ -220,6 +226,7 @@ def answerpay(request):
     	    'fechaprocesamiento': data['fecha_procesamiento'],
     	    'msg': data['mensaje'],
     	    'tipo_medio_pago': tipo_pago[data['medio_pago']],
+            'emailComprador': data['emailComprador'],
     	}    
     except KeyError:
         return HttpResponseRedirect('/') 
@@ -241,14 +248,14 @@ def answerpay(request):
         return bad_or_missing(request, _('Your order has already been processed.'))
 
     # Store payment status
-    if int(data['codigo_respuesta_pol']) != 1 and int(data['codigo_respuesta_pol']) != 26 and int(data['codigo_respuesta_pol']) != 24 and int(data['codigo_respuesta_pol']) != 9994:
-        order.add_status(status='Cancelled', notes=u"Processed through PAGOSONLINE. answerpay %s" % data['codigo_respuesta_pol'])
-    else:
-        order.add_status(status='New', notes=u"Processed through PAGOSONLINE. answerpay %s" % data['codigo_respuesta_pol'])
-        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
-        payment = processor.record_payment(
-            order=order,
-            amount=Decimal(data['valor']))
+    #if int(data['codigo_respuesta_pol']) != 1 and int(data['codigo_respuesta_pol']) != 26 and int(data['codigo_respuesta_pol']) != 24 and int(data['codigo_respuesta_pol']) != 9994:
+        #order.add_status(status='Cancelled', notes=u"Processed through PAGOSONLINE. answerpay %s" % data['codigo_respuesta_pol'])
+    #else:
+        #order.add_status(status='New', notes=u"Processed through PAGOSONLINE. answerpay %s" % data['codigo_respuesta_pol'])
+        #processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        #payment = processor.record_payment(
+            #order=order,
+            #amount=Decimal(data['valor']))
     
     # empty customer's cart
     #for cart in Cart.objects.from_request(request):
@@ -316,9 +323,5 @@ def notify_callback(request):
         order=order,
         amount=amount,
     	transaction_id=data['codigo_autorizacion'])
-    # empty customer's carts
     
-    #cartnumber = request.session['cart']
-    #for cart in Cart.objects.filter(id=cartnumber):
-    #    cart.empty()
     return HttpResponse()
