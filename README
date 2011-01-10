@@ -1,3 +1,3 @@
-Payment module for satchmo based on sermepa, to make available the use of pagosonline.net services in a satchmo based shop
+Payment module for satchmo based on sermepa, to make available the use of pagosonline.net services in a satchmo based shop.
 
 The templates directory must be placed in your templates directory /shop/checkout/pagosonline
