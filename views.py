@@ -7,6 +7,7 @@
 #   For more information about integration look at http://ayuda.pagosonline.com/
 #
 #
+
 from payment.rc_calc import rc_total
 
 from datetime import datetime
@@ -20,6 +21,7 @@ from django.views.decorators.cache import never_cache
 from livesettings import config_get_group, config_value
 from payment.utils import get_processor_by_key
 from payment.views import payship
+from satchmo_store.contact.models import Contact
 from satchmo_store.shop.models import Order, Cart
 from satchmo_store.shop.satchmo_settings import get_satchmo_setting
 from satchmo_utils.dynamic import lookup_url, lookup_template
@@ -53,6 +55,7 @@ def confirm_info(request):
 
     try:
         order = Order.objects.from_request(request)
+        get_buyer_email = Contact.objects.filter(id=order.contact_id)
     except Order.DoesNotExist:
         url = lookup_url(payment_module, 'satchmo_checkout-step1')
         return HttpResponseRedirect(url)
@@ -104,13 +107,13 @@ def confirm_info(request):
                     amount,
                     coin,
                     )))
-	cartnumber = request.session['cart']
+
+    cartnumber = request.session['cart']
     baseDevIva = rc_total(cartnumber)
     baseDevolucionIva = "%.2f" % rc_total(cartnumber)
     iva_calc = float(baseDevIva) * 0.16
     iva = "%.2f" % iva_calc
     signature=md5(signature_data).hexdigest()
-#    log.debug("signature to be sent %s" %  signature)
 
     template = lookup_template(payment_module, 'shop/checkout/pagosonline/confirm.html')
 
@@ -118,7 +121,12 @@ def confirm_info(request):
     url_ans = _resolve_local_url(payment_module, payment_module.MERCHANT_URL_OK)
 #    url_ko = _resolve_local_url(payment_module, payment_module.MERCHANT_URL_KO)
     
-    
+    try:
+        request.user.email
+        emailComprador = request.user.email
+    except:
+        emailComprador = get_buyer_email[0].email
+
     ctx = {
         'live': live,
         'post_url': post_url,
@@ -133,7 +141,7 @@ def confirm_info(request):
 	    'prueba': prueba,
 	    'iva': iva,
         'baseDevolucionIva': baseDevolucionIva,
-        'emailComprador': request.user.email,
+        'emailComprador': emailComprador,
         'default_view_tax': config_value('TAX', 'DEFAULT_VIEW_TAX'),
     }
     return render_to_response(template, ctx, context_instance=RequestContext(request))
@@ -226,8 +234,8 @@ def answerpay(request):
     	    'fechaprocesamiento': data['fecha_procesamiento'],
     	    'msg': data['mensaje'],
     	    'tipo_medio_pago': tipo_pago[data['medio_pago']],
-            'emailComprador': data['emailComprador'],
-    	}    
+    	    'emailComprador': data['emailComprador'],
+    	}   
     except KeyError:
         return HttpResponseRedirect('/') 
 
@@ -246,9 +254,9 @@ def answerpay(request):
         order = Order.objects.from_request(request)
     except Order.DoesNotExist:
         return bad_or_missing(request, _('Your order has already been processed.'))
-
     # Store payment status
     #if int(data['codigo_respuesta_pol']) != 1 and int(data['codigo_respuesta_pol']) != 26 and int(data['codigo_respuesta_pol']) != 24 and int(data['codigo_respuesta_pol']) != 9994:
+        
         #order.add_status(status='Cancelled', notes=u"Processed through PAGOSONLINE. answerpay %s" % data['codigo_respuesta_pol'])
     #else:
         #order.add_status(status='New', notes=u"Processed through PAGOSONLINE. answerpay %s" % data['codigo_respuesta_pol'])
@@ -323,5 +331,4 @@ def notify_callback(request):
         order=order,
         amount=amount,
     	transaction_id=data['codigo_autorizacion'])
-    
     return HttpResponse()
