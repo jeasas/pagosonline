@@ -30,18 +30,19 @@
 <input type="hidden" name="url_confirmacion" value="http://www.rinconcolombia.com:81/checkout/pagosonline/notify/" />
 <input type="hidden" name="firma" value="{{ signature }}" />
 <input type="hidden" name="emailComprador" value="{{ emailComprador }}" />
+<input type="hidden" name="tiposMediosDePago" value="2,3,4,5,7" />
 
 <input type="hidden" name="_confirmacion" value="{{ url_callback }}" />
 <input type="hidden" name="_respuesta" value="{{ url_ans }}" />
 
-
 {% if order.partially_paid %}
-	<input type="hidden" name="descripcion" value="Remaining Balance for order {{order}}" />
+        <input type="hidden" name="descripcion" value="Remaining Balance for order {{ order }}" />
 {% else %}
-	<input type="hidden" name="descripcion" value="Order {{order}}" />
+        <input type="hidden" name="descripcion" value="Order {{ order }}" />
 {% endif %}
 
 <input class="buttonConfirm" type="submit" value="{% trans "Purchase Items" %}" />
 </form>
 {% endif %}
 {% endblock %}
+
