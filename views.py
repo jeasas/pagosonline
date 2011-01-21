@@ -75,10 +75,10 @@ def confirm_info(request):
     live = payment_module.LIVE.value
     if live:
         post_url = payment_module.POST_URL.value
-	prueba = 0
+        prueba = 0
     else:
         post_url = payment_module.POST_TEST_URL.value
-	prueba = 1
+        prueba = 1
     #
     # PAGOSONLINE system does not accept multiple payment attempts with the same refVenta, even
     # if the previous one has never been finished. The worse is that it does not display
