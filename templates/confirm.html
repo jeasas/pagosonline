@@ -20,7 +20,6 @@
 <form action="{{ post_url }}" method="post">{% csrf_token %}
 
 <input type="hidden" name="prueba" value="{{ prueba }}" />
-<input type="hidden" name="iva" value="{{ iva }}" />
 <input type="hidden" name="baseDevolucionIva" value="{{ baseDevolucionIva }}" />
 <input type="hidden" name="usuarioId" value="{{ usuarioId }}" />
 <input type="hidden" name="valor" value="{{ amount }}" />
@@ -30,7 +29,6 @@
 <input type="hidden" name="url_confirmacion" value="http://www.rinconcolombia.com:81/checkout/pagosonline/notify/" />
 <input type="hidden" name="firma" value="{{ signature }}" />
 <input type="hidden" name="emailComprador" value="{{ emailComprador }}" />
-<input type="hidden" name="tiposMediosDePago" value="2,3,4,5,7" />
 
 <input type="hidden" name="_confirmacion" value="{{ url_callback }}" />
 <input type="hidden" name="_respuesta" value="{{ url_ans }}" />
