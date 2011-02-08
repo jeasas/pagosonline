@@ -91,7 +91,7 @@ def confirm_info(request):
     #   refVenta: xxxxxxxTYYYYDDMMHHMMSS
     #
     now = datetime.now()
-    xchg_order_id = "%07dT%04d%02d%02d%02d%02d%02d" % (order.id, now.year, now.day, now.month, now.hour, now.minute, now.second)
+    xchg_order_id = "%dT%04d%02d%02d%02d%02d%02d" % (order.id, now.year, now.day, now.month, now.hour, now.minute, now.second)
 
     signature_code = payment_module.MERCHANT_SIGNATURE_CODE.value
     userId = payment_module.MERCHANT_USERID_CODE.value
