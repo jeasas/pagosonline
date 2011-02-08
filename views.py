@@ -249,25 +249,42 @@ def answerpay(request):
         order = Order.objects.from_request(request)
     except Order.DoesNotExist:
         return bad_or_missing(request, _('Your order has already been processed.'))
-    # Store payment status
-    #if int(data['codigo_respuesta_pol']) != 1 and int(data['codigo_respuesta_pol']) != 26 and int(data['codigo_respuesta_pol']) != 24 and int(data['codigo_respuesta_pol']) != 9994:
-        
-        #order.add_status(status='Cancelled', notes=u"Processed through PAGOSONLINE. answerpay %s" % data['codigo_respuesta_pol'])
-    #else:
-        #order.add_status(status='New', notes=u"Processed through PAGOSONLINE. answerpay %s" % data['codigo_respuesta_pol'])
-        #processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
-        #payment = processor.record_payment(
-            #order=order,
-            #amount=Decimal(data['valor']))
     
-    # empty customer's cart
-    #for cart in Cart.objects.from_request(request):
-    #    cart.empty()
+    # Store payment status
+    if int(data['codigo_respuesta_pol']) == 1:
+        order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']))
+    
+    elif int(data['codigo_respuesta_pol']) == 26:
+        order.add_status(status='New', notes=u"%s " % codigo[data['codigo_respuesta_pol']])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']))
+                                                                                                            
+    elif int(data['codigo_respuesta_pol']) == 24:
+        order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']))
+
+    elif int(data['codigo_respuesta_pol']) == 9994:
+        order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']))
+    
+    else:
+        order.add_status(status='Cancelled', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
+
     cartnumber = request.session['cart']
     for cart in Cart.objects.filter(id=cartnumber):
         cart.empty()
-#    for cart in Cart.objects.filter(customer=order.contact):
-#        cart.empty()
 
     
     del request.session['orderID']
@@ -289,41 +306,70 @@ def notify_callback(request):
     try:
         sig_data = '~'.join(
 		map(str,(signature_code,
-		data['usuario_id'],
-                data['ref_venta'],
-                data['valor'],
-                data['moneda'],
-		data['estado_pol']
+		    data['usuario_id'],
+            data['ref_venta'],
+            data['valor'],
+            data['moneda'],
+    		data['estado_pol']
 		)))
+        
         sig_calc = md5(sig_data).hexdigest()
-       	if sig_calc != data['firma'].lower():
+       	
+        if sig_calc != data['firma'].lower():
             log.error("Invalid signature. Received '%s', calculated '%s'. sig_data %s" % (data['firma'], sig_calc, sig_data))
             return HttpResponseBadRequest("Checksum error")
 
         xchg_order_id = data['ref_venta']
+        
         try:
             order_id = xchg_order_id[:xchg_order_id.index('T')]
         except ValueError:
-            log.error("Incompatible order ID: '%s'" % xchg_order_id)
+            log.error("Incompatible order ID: '%s'" % order_id)
             return HttpResponseNotFound("Order not found")
         try:
             order = Order.objects.get(id=order_id)
         except Order.DoesNotExist:
             log.error("Received data for nonexistent Order #%s" % order_id)
             return HttpResponseNotFound("Order not found")
-        amount = Decimal(data['valor']) 
+        
         if int(data['codigo_respuesta_pol']) != 1 and int(data['codigo_respuesta_pol']) != 26 and int(data['codigo_respuesta_pol']) != 24 and int(data['codigo_respuesta_pol']) != 9994:
             log.info("Response code is %s. Payment not accepted." % data['codigo_respuesta_pol'])
     	    order.add_status(status='Cancelled', notes=u"Processed through PAGOSONLINE. notify callback %s" % data['codigo_respuesta_pol'])
             return HttpResponse()
+    
     except KeyError:
         log.error("Received incomplete PAGOSONLINE transaction data")
         return HttpResponseBadRequest("Incomplete data")
+    
     # success
-    order.add_status(status='New', notes=u"Processed through PAGOSONLINE. notify callback %s" % data['codigo_respuesta_pol'] )
-    processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
-    payment = processor.record_payment(
-        order=order,
-        amount=amount,
-    	transaction_id=data['codigo_autorizacion'])
-    return HttpResponse()
+
+    if int(data['codigo_respuesta_pol']) == 1:
+        order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']))
+    
+    elif int(data['codigo_respuesta_pol']) == 26:
+        order.add_status(status='New', notes=u"%s " % codigo[data['codigo_respuesta_pol']])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']))
+                                                                                                            
+    elif int(data['codigo_respuesta_pol']) == 24:
+        order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']))
+
+    elif int(data['codigo_respuesta_pol']) == 9994:
+        order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']))
+    
+    else:
+        order.add_status(status='Cancelled', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
