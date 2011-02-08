@@ -8,8 +8,6 @@
 #
 #
 
-from payment.rc_calc import rc_total
-
 from datetime import datetime
 from decimal import Decimal
 from django.core import urlresolvers
@@ -109,10 +107,8 @@ def confirm_info(request):
                     )))
 
     cartnumber = request.session['cart']
-    baseDevIva = rc_total(cartnumber)
-    baseDevolucionIva = "%.2f" % rc_total(cartnumber)
-    iva_calc = float(baseDevIva) * 0.16
-    iva = "%.2f" % iva_calc
+    baseDev = float(amount) - (float(amount) * 0.16)
+    baseDevolucionIva = "%.2f" % baseDev
     signature=md5(signature_data).hexdigest()
 
     template = lookup_template(payment_module, 'shop/checkout/pagosonline/confirm.html')
@@ -139,7 +135,6 @@ def confirm_info(request):
         'amount': amount,
         'signature': signature,
 	    'prueba': prueba,
-	    'iva': iva,
         'baseDevolucionIva': baseDevolucionIva,
         'emailComprador': emailComprador,
         'default_view_tax': config_value('TAX', 'DEFAULT_VIEW_TAX'),
