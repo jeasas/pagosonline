@@ -11,7 +11,6 @@
 {% block content %}
 <div id="success">
 <h4>{% trans "Thank you for your order!" %}</h4>
-<p>{% trans 'Please print out this page as a receipt.' %}</p>
 
 <table width="70%" height="70%" cellpadding="3" cellspacing="0" border="0">
 <tr><td align="left" valign="middle">{% trans "Buyer Email"%} </td><td align="left" valign="middle"> {{ emailComprador }}</td></tr>
@@ -24,6 +23,10 @@
 <tr><td align="left" valign="middle">{% trans "Pagos Online Response" %}</td><td align="left" valign="middle">{{ codigoresp }}</td></tr>
 <tr><td align="left" valign="middle">{% trans "Processing Date" %}</td><td align="left" valign="middle">{{ fechaprocesamiento }}</td></tr>
 </table>
+
+<form>
+<input type="button" value={% trans "Print This Page" %} onClick="window.print()" />
+</form>
 
 </div>
 {% endblock %}
