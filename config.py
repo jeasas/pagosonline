@@ -132,4 +132,4 @@ config_register_list(
         help_text=_("Add extensive logs during post."),
         default=False,
 	)
-    )
+)

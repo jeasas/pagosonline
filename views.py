@@ -25,6 +25,9 @@ from satchmo_store.shop.satchmo_settings import get_satchmo_setting
 from satchmo_utils.dynamic import lookup_url, lookup_template
 from satchmo_utils.views import bad_or_missing
 import logging
+from django.views.decorators.csrf import csrf_exempt
+
+
 try:
     from hashlib import md5
 except ImportError:
@@ -107,10 +110,7 @@ def confirm_info(request):
                     )))
 
     cartnumber = request.session['cart']
-    baseDev = float(amount) - (float(amount) * 0.16)
-    baseDevolucionIva = "%.2f" % baseDev
     signature=md5(signature_data).hexdigest()
-
     template = lookup_template(payment_module, 'shop/checkout/pagosonline/confirm.html')
 
     url_callback = _resolve_local_url(payment_module, payment_module.MERCHANT_URL_CALLBACK, ssl=get_satchmo_setting('SSL'))
@@ -135,7 +135,6 @@ def confirm_info(request):
         'amount': amount,
         'signature': signature,
 	    'prueba': prueba,
-        'baseDevolucionIva': baseDevolucionIva,
         'emailComprador': emailComprador,
         'default_view_tax': config_value('TAX', 'DEFAULT_VIEW_TAX'),
     }
@@ -150,8 +149,8 @@ def answerpay(request):
     This can be used to generate a receipt or some other confirmation
     """
     data = request.GET
+    global estado
     global codigo
-    global tipo_pago
 
     estado = {
 	'1': "Sin Abrir",
@@ -217,6 +216,7 @@ def answerpay(request):
 	'30': "Efecty",
 	'31': "Pago referenciado",
 	}	
+    
     try:    
         buyinfo = {
             'coin': payment_module.MERCHANT_CURRENCY.value,
@@ -233,143 +233,98 @@ def answerpay(request):
     	}   
     except KeyError:
         return HttpResponseRedirect('/') 
-
-    xchg_order_id = data['ref_venta']
-    try:
-    	order_id = xchg_order_id[:xchg_order_id.index('T')]
-    except ValueError:
-        log.error("Incompatible order ID: '%s'" % xchg_order_id)
-        return HttpResponseNotFound("Order not found")
-    try:
-        order = Order.objects.get(id=order_id)
-    except Order.DoesNotExist:
-        log.error("Received data for nonexistent Order #%s" % order_id)
-        return HttpResponseNotFound("Order not found")
-    try:
-        order = Order.objects.from_request(request)
-    except Order.DoesNotExist:
-        return bad_or_missing(request, _('Your order has already been processed.'))
-    
-    # Store payment status
-    if int(data['codigo_respuesta_pol']) == 1:
-        order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
-        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
-        payment = processor.record_payment(
-            order=order,
-            amount=Decimal(data['valor']))
-    
-    elif int(data['codigo_respuesta_pol']) == 26:
-        order.add_status(status='New', notes=u"%s " % codigo[data['codigo_respuesta_pol']])
-        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
-        payment = processor.record_payment(
-            order=order,
-            amount=Decimal(data['valor']))
-                                                                                                            
-    elif int(data['codigo_respuesta_pol']) == 24:
-        order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
-        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
-        payment = processor.record_payment(
-            order=order,
-            amount=Decimal(data['valor']))
-
-    elif int(data['codigo_respuesta_pol']) == 9994:
-        order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
-        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
-        payment = processor.record_payment(
-            order=order,
-            amount=Decimal(data['valor']))
-    
-    else:
-        order.add_status(status='Cancelled', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
-
+        
     cartnumber = request.session['cart']
     for cart in Cart.objects.filter(id=cartnumber):
         cart.empty()
 
-    
-    del request.session['orderID']
     return render_to_response('shop/checkout/pagosonline/answer.html', buyinfo,
                               context_instance=RequestContext(request))
 
 answerpay = never_cache(answerpay)
 
+@csrf_exempt
 def notify_callback(request):
     
     payment_module = config_get_group('PAYMENT_PAGOSONLINE')
     signature_code = payment_module.MERCHANT_SIGNATURE_CODE.value
     if payment_module.LIVE.value:
-        log.debug("Live IPN on %s", payment_module.KEY.value)
+        log.debug("Live on %s", payment_module.KEY.value)
     else:
-        log.debug("Test IPN on %s", payment_module.KEY.value)
+        log.debug("Test on %s", payment_module.KEY.value)
     data = request.POST
     log.debug("Transaction data: " + repr(data))
+
     try:
         sig_data = '~'.join(
-		map(str,(signature_code,
-		    data['usuario_id'],
-            data['ref_venta'],
-            data['valor'],
-            data['moneda'],
-    		data['estado_pol']
-		)))
-        
+            map(str,(signature_code,
+                data['usuario_id'],
+                data['ref_venta'],
+                data['valor'],
+                data['moneda'],
+                data['estado_pol']
+        )))
+    
         sig_calc = md5(sig_data).hexdigest()
-       	
         if sig_calc != data['firma'].lower():
             log.error("Invalid signature. Received '%s', calculated '%s'. sig_data %s" % (data['firma'], sig_calc, sig_data))
             return HttpResponseBadRequest("Checksum error")
 
         xchg_order_id = data['ref_venta']
-        
         try:
             order_id = xchg_order_id[:xchg_order_id.index('T')]
         except ValueError:
-            log.error("Incompatible order ID: '%s'" % order_id)
+            log.error("Incompatible order ID: '%s'" % xchg_order_id)
             return HttpResponseNotFound("Order not found")
         try:
             order = Order.objects.get(id=order_id)
         except Order.DoesNotExist:
             log.error("Received data for nonexistent Order #%s" % order_id)
             return HttpResponseNotFound("Order not found")
-        
-        if int(data['codigo_respuesta_pol']) != 1 and int(data['codigo_respuesta_pol']) != 26 and int(data['codigo_respuesta_pol']) != 24 and int(data['codigo_respuesta_pol']) != 9994:
-            log.info("Response code is %s. Payment not accepted." % data['codigo_respuesta_pol'])
-    	    order.add_status(status='Cancelled', notes=u"Processed through PAGOSONLINE. notify callback %s" % data['codigo_respuesta_pol'])
-            return HttpResponse()
-    
     except KeyError:
         log.error("Received incomplete PAGOSONLINE transaction data")
         return HttpResponseBadRequest("Incomplete data")
     
     # success
-
     if int(data['codigo_respuesta_pol']) == 1:
         order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
         processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
         payment = processor.record_payment(
             order=order,
-            amount=Decimal(data['valor']))
-    
-    elif int(data['codigo_respuesta_pol']) == 26:
-        order.add_status(status='New', notes=u"%s " % codigo[data['codigo_respuesta_pol']])
-        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
-        payment = processor.record_payment(
-            order=order,
-            amount=Decimal(data['valor']))
-                                                                                                            
-    elif int(data['codigo_respuesta_pol']) == 24:
-        order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
-        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
-        payment = processor.record_payment(
-            order=order,
-            amount=Decimal(data['valor']))
+            amount=Decimal(data['valor']),
+            transaction_id=codigo[data['codigo_respuesta_pol']])
 
-    elif int(data['codigo_respuesta_pol']) == 9994:
+    elif int(data['codigo_respuesta_pol']) == 15:
+        order.add_status(status='In Process', notes=u"%s " % codigo[data['codigo_respuesta_pol']])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']),
+            transaction_id=codigo[data['codigo_respuesta_pol']])
+
+    elif int(data['codigo_respuesta_pol']) == 26:
+        order.add_status(status='In Process', notes=u"%s " % codigo[data['codigo_respuesta_pol']])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']),
+            transaction_id=codigo[data['codigo_respuesta_pol']])
+
+    elif int(data['codigo_respuesta_pol']) == 24:
+        order.add_status(status='Billed', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
+        processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
+        payment = processor.record_payment(
+            order=order,
+            amount=Decimal(data['valor']),
+            transaction_id=codigo[data['codigo_respuesta_pol']])            
+
+    elif int(data['codigo_respuesta_pol']) == 9994:        
         order.add_status(status='New', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
         processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
         payment = processor.record_payment(
             order=order,
-            amount=Decimal(data['valor']))
-    
+            amount=Decimal(data['valor']),
+            transaction_id=codigo[data['codigo_respuesta_pol']])
+
     else:
         order.add_status(status='Cancelled', notes=u"%s" % codigo[data['codigo_respuesta_pol']])

@@ -1,1 +1,1 @@
-The templates directory must be placed in your shop templates at shop/checkout/pagosonline
+The templates directory must be placed in src/satchmo/satchmo/apps/payment/templates/shop/checkout/pagosonline
