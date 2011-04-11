@@ -99,6 +99,7 @@ def confirm_info(request):
     signature_code = payment_module.MERCHANT_SIGNATURE_CODE.value
     userId = payment_module.MERCHANT_USERID_CODE.value
     amount = "%.2f" % order.balance
+    log.debug("Amount for confirm Info %s" % amount)
     coin = payment_module.MERCHANT_CURRENCY.value
     signature_data = '~'.join(
             map(str, (
@@ -127,6 +128,12 @@ def confirm_info(request):
     except:
         emailComprador = get_buyer_email[0].email
 
+    float_balance = float(order.balance)
+    no_iva = float_balance/1.16
+    iva = round(0.16*no_iva,2)
+    
+    log.debug("IVA = %f" % iva)
+
     ctx = {
         'live': live,
         'post_url': post_url,
@@ -137,11 +144,15 @@ def confirm_info(request):
 	    'order': order,
         'xchg_order_id': xchg_order_id,
         'amount': amount,
+        'iva': iva,
         'signature': signature,
 	    'prueba': prueba,
         'emailComprador': emailComprador,
         'default_view_tax': config_value('TAX', 'DEFAULT_VIEW_TAX'),
     }
+
+    log.debug(ctx)
+
     return render_to_response(template, ctx, context_instance=RequestContext(request))
 confirm_info = never_cache(confirm_info)
 
@@ -289,7 +300,9 @@ def notify_callback(request):
         except Order.DoesNotExist:
             log.error("Received data for nonexistent Order #%s" % order_id)
             return HttpResponseNotFound("Order not found")
-        amount = Decimal(data['valor'])
+        amount = data['valor']
+        log.debug("Amount Received in POST %s" % amount)
+        trans_id = codigo[data['codigo_respuesta_pol']]
     except KeyError:
         log.error("Received incomplete PAGOSONLINE transaction data")
         return HttpResponseBadRequest("Incomplete data")
@@ -301,7 +314,7 @@ def notify_callback(request):
         payment = processor.record_payment(
             order=order,
             amount=amount,
-            transaction_id=codigo[data['codigo_respuesta_pol']])
+            transaction_id=trans_id)
 
     elif int(data['codigo_respuesta_pol']) == 15:
         order.add_status(status='In Process', notes=u"%s " % codigo[data['codigo_respuesta_pol']])
@@ -309,7 +322,7 @@ def notify_callback(request):
         payment = processor.record_payment(
             order=order,
             amount=amount,
-            transaction_id=codigo[data['codigo_respuesta_pol']])
+            transaction_id=trans_id)
 
     elif int(data['codigo_respuesta_pol']) == 26:
         order.add_status(status='In Process', notes=u"%s " % codigo[data['codigo_respuesta_pol']])
@@ -317,7 +330,7 @@ def notify_callback(request):
         payment = processor.record_payment(
             order=order,
             amount=amount,
-            transaction_id=codigo[data['codigo_respuesta_pol']])
+            transaction_id=trans_id)
 
     elif int(data['codigo_respuesta_pol']) == 24:
         order.add_status(status='Billed', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
@@ -325,16 +338,16 @@ def notify_callback(request):
         payment = processor.record_payment(
             order=order,
             amount=amount,
-            transaction_id=codigo[data['codigo_respuesta_pol']])            
+            transaction_id=trans_id)            
 
     elif int(data['codigo_respuesta_pol']) == 9994:        
         processor = get_processor_by_key('PAYMENT_PAGOSONLINE')
         payment = processor.record_payment(
             order=order,
             amount=amount,
-            transaction_id=codigo[data['codigo_respuesta_pol']])
+            transaction_id=trans_id)
 
     else:
-        order.add_status(status='Cancelled', notes=u"%s" % codigo[data['codigo_respuesta_pol']])
+        order.add_status(status='Cancelled', notes=u"%s" % trans_id)
 
     return HttpResponse()
