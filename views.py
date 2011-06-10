@@ -160,6 +160,12 @@ def answerpay(request):
 
     payment_module = config_get_group('PAYMENT_PAGOSONLINE')
 
+    try:
+        order = Order.objects.from_request(request)
+    except Order.DoesNotExist:
+        url = lookup_url(payment_module, 'satchmo_checkout-step1')
+        return HttpResponseRedirect(url)
+
     """
     This can be used to generate a receipt or some other confirmation
     """
@@ -245,6 +251,7 @@ def answerpay(request):
     	    'msg': data['mensaje'],
     	    'tipo_medio_pago': tipo_pago[data['medio_pago']],
     	    'emailComprador': data['emailComprador'],
+    	    'order': order,
     	}   
     except KeyError:
         return HttpResponseRedirect('/') 
