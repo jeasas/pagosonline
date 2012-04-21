@@ -18,7 +18,7 @@ config_register_list(
         'MODULE',
         description=_('Implementation module'),
         hidden=True,
-        default = 'payment.modules.pagosonline',
+        default = 'pagosonline',
         ),
     StringValue(PAYMENT_GROUP,
         'KEY',
